@@ -1,0 +1,220 @@
+﻿@model IEnumerable<AdminPanel.Models.User>
+
+@{
+    ViewBag.Title = "ShowUsers";
+}
+
+@if (ViewBag.ErrorMessage != null && ViewBag.ErrorMessage != "")
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-top:10px;">
+        @ViewBag.ErrorMessage
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+}
+
+
+
+<div id="divMsgClient" class="alert alert-dismissible fade show" role="alert" style="margin-top:10px;">
+    <span id="spanMsgClient">Message</span>
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+    </button>
+</div>
+<div class="row" style="margin-top:10px;">
+    <div class="col">
+        @Html.Label("Total Count : ")
+        @Html.Label(Model.Count().ToString(), new { id = "lblCount" })
+    </div>
+    <div class="col">
+        <button id="btnAddNew" class="btn  btn-success btn-circle float-right"><i class="fa fa-plus"></i></button>
+    </div>
+</div>
+
+<table class="table table-sm table-bordered table-hover" id="tblData">
+    <thead class="table-header-footer">
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Name)
+            </th>
+            <th></th>
+
+        </tr>
+    <thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Id)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Name)
+                </td>
+                <td>
+                    <a href='@Url.Action("EditUser","UserMaster", new { Id = item.Id })' class="linkEdit btn  btn-warning btn-circle">
+                        <i class="fa fa-edit"></i>
+                    </a>
+
+                    <a data-del-id="@item.Id" class="linkDel btn  btn-danger btn-circle">
+                        <i class="fa fa-trash"></i>
+                    </a>
+
+                </td>
+            </tr>
+        }
+    <tbody>
+    <tfoot class="table-header-footer">
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Name)
+            </th>
+            <th></th>
+        </tr>
+    </tfoot>
+</table>
+
+<!-- Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header" style="background-color:#009688;color:white">
+                <h5 class="modal-title" id="confirmModalLabel">Confirm</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Do you want to delete?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">No</button>
+                <button id="btnDelete" type="submit" class="btn btn-danger btn-sm">Yes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="modalWrapper">
+    @* Inject form here *@
+</div>
+
+@section scripts
+{
+    @Scripts.Render("~/bundles/datatablejs")
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            //Enable datatable on table
+            var dataTableUser = $('#tblData').DataTable();
+
+            $("#spanPageHeader").html("User Master");
+            $("#divMsgClient").hide();
+        
+            //this value will be send to controller for user operation
+            var SelectedId;
+            var SelectedRow;
+            //************** Start Grid Delete Link to show delete confirmation popup*****************
+            $('#tblData').on('click', '.linkDel', function (e) {
+           // $(".linkDel").click(function (e) {
+                $('#confirmModal').modal('show');
+                SelectedId = $(this).data("del-id");
+                SelectedRow = $(this).parents("tr:first");
+            });
+            //***********End************************
+            //************************Start Delete Button From Delete Confirmation Modal*********************
+            $("#btnDelete").click(function () {
+                $('#confirmModal').modal('hide');
+                var obj = { "Id": SelectedId };
+                var myJSON = JSON.stringify(obj);
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("DeleteUser")',
+                    data: myJSON,
+                    contentType: "application/json; charset=utf-8",
+                    dataType: "json",
+                    success: function (response) {
+                        if (response.Response == "Y") {
+                            SelectedRow.fadeOut('fast', function () {
+                                //SelectedRow.remove();
+                                dataTableUser.row(SelectedRow).remove().draw();
+                            });
+                            $("#divMsgClient").addClass("alert-success");
+                            $("#spanMsgClient").text("User deleted successfully");
+                            $("#divMsgClient").show();
+                            //Calculate total
+                            var lblCount = parseInt($("#lblCount").text());
+                            lblCount = lblCount - 1;
+                            $("#lblCount").text(lblCount);
+                        
+                        }
+                        else {
+                            $("#divMsgClient").addClass("alert-warning");
+                            $("#spanMsgClient").text(response.ErrorMessage);
+                            $("#divMsgClient").show();
+                        }
+                    },
+                    failure: function (response) {
+                        $("#divMsgClient").addClass("alert-warning");
+                        $("#spanMsgClient").text(response.responseText);
+                        $("#divMsgClient").show();
+                    },
+                    error: function (response) {
+                        $("#divMsgClient").addClass("alert-warning");
+                        $("#spanMsgClient").text(response.responseText);
+                        $("#divMsgClient").show();
+                    }
+                });
+            });
+
+            //************End**************************
+            //*************Show Edit popup call partial view*************
+            //++++++++++++Below code would not work with datatable for second  page because this event attah only on visible row
+            //$(".linkEdit").click(function (e) {
+            //    e.preventDefault();
+            //    var editHref = $(this).attr("href");
+            //    $.ajax({
+            //        url: editHref,
+            //        success: function (data) {
+            //            $('#modalWrapper').html(data);
+            //            $('#editModal').modal('show');
+            //        }
+            //    });
+            //});
+
+            $('#tblData').on('click', '.linkEdit', function (e) {
+                e.preventDefault();
+                var editHref = $(this).attr("href");
+                $.ajax({
+                    url: editHref,
+                    success: function (data) {
+                        $('#modalWrapper').html(data);
+                        $('#editModal').modal('show');
+                    }
+                });
+            });
+
+            //************Show New User Modal**************
+            $("#btnAddNew").click(function () {
+                $.ajax({
+                    url: "/UserMaster/AddNewUser",
+                    success: function (data) {
+                        $('#modalWrapper').html(data);
+                        $('#addNewUserModal').modal('show');
+                    }
+                });
+            });
+        });
+        //***************End*******************8
+
+    </script>
+
+}
